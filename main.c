@@ -8,29 +8,11 @@
 #include <malloc.h>
 static void *md = 0;
 static int fd = -1;
+#define START_ADDRESS   0xf0000000
 
 
-static void init_memory()
-{
-	fd = open("heap_memory", O_CREAT | O_RDWR, 0666);
-	if(fd <= 0)
-	{
-		fprintf(stderr, "error to init heap memory file\n");
-	 	exit(-1);
-	}
-	md = mmalloc_attach(fd, (void*) 0xf0000000);
-	if(md==0)
-	{
-	 	fprintf(stderr, "error to init memory\n");
-	 	exit(-1);
-	}
-}
 
 
-static void close_memory()
-{
-	mmalloc_detach(md);
-}
 
 void *realloc(void *ptr, size_t size) {
 	
@@ -56,13 +38,26 @@ void *calloc(size_t num, size_t size) {
 
 
 __attribute__((constructor)) void _mstart(void) {
-    printf("Advanced heap memory library loaded!\n");
-    init_memory();
+    
+    fprintf(stderr, "Persistent Heap Library Loaded\n");
+    char *check_point_num = getenv("CHECKPOINT");
+	if(check_point_num != 0 && check_point_num[0] != '\0')
+	{
+		fprintf(stderr, "Load with a checkpoint %s!\n", check_point_num);
+		fd = open(check_point_num, O_RDWR, 0666);
+		if(fd <= 0)
+		{
+			fprintf(stderr, "Error when loading checkpoint memory file\n");
+		 	exit(-1);
+		}
+	}
+	md = mmalloc_attach(fd, (void*) START_ADDRESS);
+	if(md==0)
+	{
+	 	fprintf(stderr, "error to init memory\n");
+	 	exit(-1);
+	}
 }
 
-__attribute__((destructor)) void _mend(void) {
-    printf("Advanced heap memory library closed!\n");
-    close_memory();
-}
 
 

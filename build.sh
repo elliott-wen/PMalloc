@@ -1,2 +1,2 @@
-gcc -fPIC -g -shared main.c mm.o -o advancedheap.so
+gcc -fPIC -g -shared main.c mm.o -o persistentheap.so
 
