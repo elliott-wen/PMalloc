@@ -27,7 +27,7 @@ int main()
 	int *data = malloc(1024 * 400);
 	memset(data, 1, 1024*4);
 	printf("%p\n", data);
-	//printf("%u %u %u %p %p.\n", allocated_num, gm_state_size, gm_param_size, gm_ptr, param_ptr);
+	
 	void *gm_ptr = 0;
 	void *param_ptr = 0;
 	unsigned int allocated_num = get_allocated_space_size();
@@ -45,5 +45,9 @@ int main()
 	write(fd, (void*)EHEAP_START_ADDRESS, allocated_num);
 	write(fd, &magic_num, sizeof(magic_num));
 	close(fd);
+	allocated_num = get_allocated_space_size();
+	gm_state_size = get_gm_state(&gm_ptr);
+	gm_param_size = get_mparams(&param_ptr);
+	printf("%u %u %u %p %p.\n", allocated_num, gm_state_size, gm_param_size, gm_ptr, param_ptr);
 	return 0;
 }
