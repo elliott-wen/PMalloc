@@ -2698,6 +2698,20 @@ static int init_mmap_eheap()
               exit(-4);
           }
 
+          data_read = read(fd, &mparams, sizeof(mparams));
+          if(data_read != sizeof(mparams))
+          {
+              close(fd);
+              exit(-3);
+          }
+
+          data_read = read(fd, &magic_num, 4);
+          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          {
+              close(fd);
+              exit(-4);
+          }
+
           data_read = read(fd, &allocated_space, sizeof(allocated_space));
           if(data_read != sizeof(allocated_space) || allocated_space > EHEAP_SIZE)
           {
@@ -2750,6 +2764,12 @@ unsigned int mm_get_gm_state(void **ptr)
 {
     *ptr = &_gm_;
     return sizeof(_gm_);
+}
+
+unsigned int mm_get_mparams(void **ptr)
+{
+    *ptr = &mparams;
+    return sizeof(mparams);
 }
 
 void *osMoreCore(int size)
