@@ -2647,10 +2647,10 @@ static struct malloc_state _gm_;
 #define EHEAP_START_ADDRESS 0xf0000000
 #define EHEAP_SIZE 0x10000000 
 #define MAGIC_MAGIC 0x08032018
-static int is_mmap_allocated = 0;
+static int is_mmap_inited = 0;
 static unsigned int allocated_space = 0;
 
-int init_mmap_eheap()
+static int init_mmap_eheap()
 {
 
     
@@ -2663,82 +2663,97 @@ int init_mmap_eheap()
   }
   else
   {
-      unsigned int magic_num;
-      int data_read = -1;
-      char* memory_input_file_path;
-      memory_input_file_path = getenv("CHECKPOINT");
-      if(memory_input_file_path!=0 && memory_input_file_path[0] != '\0')
-      { 
-          int fd = open(memory_input_file_path, O_RDONLY);
-          if(fd <= 0)
-          {
-              return -1;
-          }
+      return 0;
+      // unsigned int magic_num;
+      // int data_read = -1;
+      // char* memory_input_file_path;
+      // memory_input_file_path = getenv("CHECKPOINT");
+      // if(memory_input_file_path!=0 && memory_input_file_path[0] != '\0')
+      // { 
+      //     int fd = open(memory_input_file_path, O_RDONLY);
+      //     if(fd <= 0)
+      //     {
+      //         exit(-1);
+      //     }
 
 
-          data_read = read(fd, &magic_num, 4);
-          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
-          {
-              close(fd);
-              return -1;
-          }
+      //     data_read = read(fd, &magic_num, 4);
+      //     if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+      //     {
+      //         close(fd);
+      //         exit(-2);
+      //     }
           
-          data_read = read(fd, &_gm_, sizeof(_gm_));
-          if(data_read != sizeof(_gm_))
-          {
-              close(fd);
-              return -1;
-          }
+      //     data_read = read(fd, &_gm_, sizeof(_gm_));
+      //     if(data_read != sizeof(_gm_))
+      //     {
+      //         close(fd);
+      //         exit(-3);
+      //     }
 
-          data_read = read(fd, &allocated_space, sizeof(allocated_space));
-          if(data_read != sizeof(allocated_space) || allocated_space > EHEAP_SIZE)
-          {
-              close(fd);
-              return -1;
-          }
+      //     data_read = read(fd, &magic_num, 4);
+      //     if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+      //     {
+      //         close(fd);
+      //         exit(-4);
+      //     }
 
-          data_read = read(fd, (void*)EHEAP_START_ADDRESS, allocated_space);
-          if(data_read != allocated_space)
-          {
-              close(fd);
-              return -1;
-          }
+      //     data_read = read(fd, &allocated_space, sizeof(allocated_space));
+      //     if(data_read != sizeof(allocated_space) || allocated_space > EHEAP_SIZE)
+      //     {
+      //         close(fd);
+      //         exit(-5);
+      //     }
 
+      //     data_read = read(fd, &magic_num, 4);
+      //     if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+      //     {
+      //         close(fd);
+      //         exit(-6);
+      //     }
 
+      //     data_read = read(fd, (void*)EHEAP_START_ADDRESS, allocated_space);
+      //     if(data_read != allocated_space)
+      //     {
+      //         close(fd);
+      //         exit(-7);
+      //     }
 
-      }
-      else
-      {
-          return 0;
-      }
+      //     data_read = read(fd, &magic_num, 4);
+      //     if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+      //     {
+      //         close(fd);
+      //         exit(-8);
+      //     }
+
+      //     close(fd);
+      //     return 0;
+      // }
+      // else
+      // {
+      //     return 0;
+      // }
   }
     
   return -1;
 }
 
-unsigned int get_allocated_space_size()
+
+
+
+unsigned int mm_get_allocated_space_size()
 {
     return allocated_space;
 }
 
-unsigned int get_gm_state(void **ptr)
+unsigned int mm_get_gm_state(void **ptr)
 {
-    ptr = (void*)&_gm_;
+    *ptr = &_gm_;
     return sizeof(_gm_);
 }
 
 void *osMoreCore(int size)
 {
-    //First time
-    if(is_mmap_allocated == 0)
-    {
-        if(init_mmap_eheap() != 0)
-        {
-            return (void *) MFAIL; //No Point Going
-        }
-        is_mmap_allocated = 1;
-    }
-
 
     if (size > 0)
     {
@@ -2759,6 +2774,46 @@ void *osMoreCore(int size)
         return (char*)(EHEAP_START_ADDRESS) + allocated_space; //Return the END address.
     }
 }
+
+void *malloc(size_t howmany)
+{
+    if(!is_mmap_inited)
+    {
+       if(init_mmap_eheap() != 0)
+       {
+            exit(-1);
+       }
+       is_mmap_inited = 1;
+    }
+    return dlmalloc(howmany);
+}
+
+void *calloc(size_t a, size_t b)
+{
+    if(!is_mmap_inited)
+    {
+       if(init_mmap_eheap() != 0)
+       {
+            exit(-1);
+       }
+       is_mmap_inited = 1;
+    }
+    return dlcalloc(a, b);
+}
+
+
+
+void free(void *ptr) //Just Proxy, if somebody really wants to free before malloc, screw them
+{
+    return dlfree(ptr);
+}
+
+void* realloc(void* a, size_t howmany)
+{
+    return dlrealloc(a, howmany);
+}
+
+
 #endif
 
 
