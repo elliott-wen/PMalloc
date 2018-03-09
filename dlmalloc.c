@@ -2599,37 +2599,132 @@ struct malloc_state {
   size_t     exts;
 };
 
+
+
+
+
+
+typedef struct malloc_state*    mstate;
+
+/* ------------- Global malloc_state and malloc_params ------------------- */
+
+/*
+  malloc_params holds global properties, including those that can be
+  dynamically set using mallopt. There is a single instance, mparams,
+  initialized in init_mparams. Note that the non-zeroness of "magic"
+  also serves as an initialization flag.
+*/
+
+struct malloc_params {
+  size_t magic;
+  size_t page_size;
+  size_t granularity;
+  size_t mmap_threshold;
+  size_t trim_threshold;
+  flag_t default_mflags;
+};
+
+static struct malloc_params mparams;
+
+/* Ensure mparams initialized */
+#define ensure_initialization() (void)(mparams.magic != 0 || init_mparams())
+
+#if !ONLY_MSPACES
+
+/* The global malloc_state used for all non-"mspace" calls */
+static struct malloc_state _gm_;
+#define gm                 (&_gm_)
+#define is_global(M)       ((M) == &_gm_)
+
+
+
 /* Our Patch To Allocate Something */
 #ifdef USE_OS_MORE_CORE
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #define EHEAP_START_ADDRESS 0xf0000000
 #define EHEAP_SIZE 0x10000000 
+#define MAGIC_MAGIC 0x08032018
 static int is_mmap_allocated = 0;
 static unsigned int allocated_space = 0;
 
 int init_mmap_eheap()
 {
-    char* memory_input_file_path;
-    memory_input_file_path = 0;
-    if(memory_input_file_path!=0 && memory_input_file_path[0] != '\0')
-    { 
 
-    }
-    else
-    {
-        char *tmpaddr;
-        tmpaddr = mmap((void*)EHEAP_START_ADDRESS, EHEAP_SIZE, PROT_READ | PROT_WRITE,
+    
+  char *tmpaddr;
+  tmpaddr = mmap((void*)EHEAP_START_ADDRESS, EHEAP_SIZE, PROT_READ | PROT_WRITE,
                  MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-        if (tmpaddr == MAP_FAILED || tmpaddr != (void*)EHEAP_START_ADDRESS)
-        {
-            return -1;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    return -1;
+  if (tmpaddr == MAP_FAILED || tmpaddr != (void*)EHEAP_START_ADDRESS)
+  {
+      return -1;
+  }
+  else
+  {
+      unsigned int magic_num;
+      int data_read = -1;
+      char* memory_input_file_path;
+      memory_input_file_path = getenv("CHECKPOINT");
+      if(memory_input_file_path!=0 && memory_input_file_path[0] != '\0')
+      { 
+          int fd = open(memory_input_file_path, O_RDONLY);
+          if(fd <= 0)
+          {
+              return -1;
+          }
+
+
+          data_read = read(fd, &magic_num, 4);
+          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          {
+              close(fd);
+              return -1;
+          }
+          
+          data_read = read(fd, &_gm_, sizeof(_gm_));
+          if(data_read != sizeof(_gm_))
+          {
+              close(fd);
+              return -1;
+          }
+
+          data_read = read(fd, &allocated_space, sizeof(allocated_space));
+          if(data_read != sizeof(allocated_space) || allocated_space > EHEAP_SIZE)
+          {
+              close(fd);
+              return -1;
+          }
+
+          data_read = read(fd, (void*)EHEAP_START_ADDRESS, allocated_space);
+          if(data_read != allocated_space)
+          {
+              close(fd);
+              return -1;
+          }
+
+
+
+      }
+      else
+      {
+          return 0;
+      }
+  }
+    
+  return -1;
+}
+
+unsigned int get_allocated_space_size()
+{
+    return allocated_space;
+}
+
+unsigned int get_gm_state(void **ptr)
+{
+    ptr = (void*)&_gm_;
+    return sizeof(_gm_);
 }
 
 void *osMoreCore(int size)
@@ -2670,41 +2765,6 @@ void *osMoreCore(int size)
 
 /* Our Patch End */
 
-
-
-
-
-typedef struct malloc_state*    mstate;
-
-/* ------------- Global malloc_state and malloc_params ------------------- */
-
-/*
-  malloc_params holds global properties, including those that can be
-  dynamically set using mallopt. There is a single instance, mparams,
-  initialized in init_mparams. Note that the non-zeroness of "magic"
-  also serves as an initialization flag.
-*/
-
-struct malloc_params {
-  size_t magic;
-  size_t page_size;
-  size_t granularity;
-  size_t mmap_threshold;
-  size_t trim_threshold;
-  flag_t default_mflags;
-};
-
-static struct malloc_params mparams;
-
-/* Ensure mparams initialized */
-#define ensure_initialization() (void)(mparams.magic != 0 || init_mparams())
-
-#if !ONLY_MSPACES
-
-/* The global malloc_state used for all non-"mspace" calls */
-static struct malloc_state _gm_;
-#define gm                 (&_gm_)
-#define is_global(M)       ((M) == &_gm_)
 
 #endif /* !ONLY_MSPACES */
 

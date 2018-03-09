@@ -17,11 +17,9 @@ int main()
  //    	printf("%p\n", addr);
  //    memset((void*)EHEAP_START_ADDRESS, 1, 1024);
  //    return 1;
-	int *data = malloc(1024*1024);
-	int *data2 = malloc(1024*1024);
-	int *data3 = malloc(1024*1024);
-	memset(data2, 1, 4);
-	printf("%p\n", data3);
+	int *data = malloc(1024 * 400);
+	int *data1 = malloc(1024*10)
+	memset(data, 1, 1024*4);
+	printf("%p\n", data);
 	free(data);
-	
 }
