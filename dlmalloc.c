@@ -2663,76 +2663,76 @@ static int init_mmap_eheap()
   }
   else
   {
-      return 0;
-      // unsigned int magic_num;
-      // int data_read = -1;
-      // char* memory_input_file_path;
-      // memory_input_file_path = getenv("CHECKPOINT");
-      // if(memory_input_file_path!=0 && memory_input_file_path[0] != '\0')
-      // { 
-      //     int fd = open(memory_input_file_path, O_RDONLY);
-      //     if(fd <= 0)
-      //     {
-      //         exit(-1);
-      //     }
+      
+      unsigned int magic_num;
+      int data_read = -1;
+      char* memory_input_file_path;
+      memory_input_file_path = getenv("CHECKPOINT");
+      if(memory_input_file_path!=0 && memory_input_file_path[0] != '\0')
+      { 
+          int fd = open(memory_input_file_path, O_RDONLY);
+          if(fd <= 0)
+          {
+              exit(-1);
+          }
 
 
-      //     data_read = read(fd, &magic_num, 4);
-      //     if(data_read <= 0 || magic_num != MAGIC_MAGIC)
-      //     {
-      //         close(fd);
-      //         exit(-2);
-      //     }
+          data_read = read(fd, &magic_num, 4);
+          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          {
+              close(fd);
+              exit(-2);
+          }
           
-      //     data_read = read(fd, &_gm_, sizeof(_gm_));
-      //     if(data_read != sizeof(_gm_))
-      //     {
-      //         close(fd);
-      //         exit(-3);
-      //     }
+          data_read = read(fd, &_gm_, sizeof(_gm_));
+          if(data_read != sizeof(_gm_))
+          {
+              close(fd);
+              exit(-3);
+          }
 
-      //     data_read = read(fd, &magic_num, 4);
-      //     if(data_read <= 0 || magic_num != MAGIC_MAGIC)
-      //     {
-      //         close(fd);
-      //         exit(-4);
-      //     }
+          data_read = read(fd, &magic_num, 4);
+          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          {
+              close(fd);
+              exit(-4);
+          }
 
-      //     data_read = read(fd, &allocated_space, sizeof(allocated_space));
-      //     if(data_read != sizeof(allocated_space) || allocated_space > EHEAP_SIZE)
-      //     {
-      //         close(fd);
-      //         exit(-5);
-      //     }
+          data_read = read(fd, &allocated_space, sizeof(allocated_space));
+          if(data_read != sizeof(allocated_space) || allocated_space > EHEAP_SIZE)
+          {
+              close(fd);
+              exit(-5);
+          }
 
-      //     data_read = read(fd, &magic_num, 4);
-      //     if(data_read <= 0 || magic_num != MAGIC_MAGIC)
-      //     {
-      //         close(fd);
-      //         exit(-6);
-      //     }
+          data_read = read(fd, &magic_num, 4);
+          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          {
+              close(fd);
+              exit(-6);
+          }
 
-      //     data_read = read(fd, (void*)EHEAP_START_ADDRESS, allocated_space);
-      //     if(data_read != allocated_space)
-      //     {
-      //         close(fd);
-      //         exit(-7);
-      //     }
+          data_read = read(fd, (void*)EHEAP_START_ADDRESS, allocated_space);
+          if(data_read != allocated_space)
+          {
+              close(fd);
+              exit(-7);
+          }
 
-      //     data_read = read(fd, &magic_num, 4);
-      //     if(data_read <= 0 || magic_num != MAGIC_MAGIC)
-      //     {
-      //         close(fd);
-      //         exit(-8);
-      //     }
+          data_read = read(fd, &magic_num, 4);
+          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          {
+              close(fd);
+              exit(-8);
+          }
 
-      //     close(fd);
-      //     return 0;
-      // }
-      // else
-      // {
-      //     return 0;
-      // }
+          close(fd);
+          return 0;
+      }
+      else
+      {
+          return 0;
+      }
   }
     
   return -1;
