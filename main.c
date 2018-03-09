@@ -1,45 +1,69 @@
 #include <string.h>
 #include <stdlib.h>
-#include "mmalloc.h"
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <malloc.h>
-static void *md = 0;
-static int fd = -1;
-#define START_ADDRESS   0xf0000000
+
+#define HEAP_START_ADDRESS   0xf0000000
 
 
+// static void validate_process()
+// {
+//     char name[1024];
+//     int pid = getpid();
+//     sprintf(name, "/proc/%d/cmdline",pid);
+//     FILE* f = fopen(name,"r");
+//     if(f){
+//         size_t stmp;
+//         stmp = fread(name, sizeof(char), 1024, f);
+//         name[1023] = '\0';
+//         fclose(f);
+//         if (strstr(name, "lua") != NULL) {
+//         	return;
+//         }
+//         else
+//         {
+//         	fprintf(stderr, "It is not a validated program %s. Exiting.\n", name);
+//         }
+//     }
+//     else
+//     {
+//     	fprintf(stderr, "Error to validate process name.\n");
+//     }
+//     exit(-1);
+    
+// }
 
 
-
-void *realloc(void *ptr, size_t size) {
+// void *realloc(void *ptr, size_t size) {
 	
-	return mrealloc(md, ptr, size);
-}
+// 	return mrealloc(md, ptr, size);
+// }
 
-void free(void *ptr) {
+// void free(void *ptr) {
 	
-    mfree(md, ptr);
-}
+//     mfree(md, ptr);
+// }
 
 
-void *malloc(size_t size) {
+// void *malloc(size_t size) {
 	
-    return mmalloc(md, size);
-}
+//     return mmalloc(md, size);
+// }
 
-void *calloc(size_t num, size_t size) {
+// void *calloc(size_t num, size_t size) {
 	
-    return mcalloc(md, num, size);
-}
+//     return mcalloc(md, num, size);
+// }
 
 
 
 __attribute__((constructor)) void _mstart(void) {
     
+
     fprintf(stderr, "Persistent Heap Library Loaded\n");
+    //validate_process();
     char *check_point_num = getenv("CHECKPOINT");
 	if(check_point_num != 0 && check_point_num[0] != '\0')
 	{

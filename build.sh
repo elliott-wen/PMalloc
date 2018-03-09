@@ -1,2 +1,2 @@
-gcc -fPIC -g -shared main.c mm.o -o persistentheap.so
+gcc -fPIC -g -DUSE_LOCKS=0 -DUSE_OS_MORE_CORE=1 -DMORECORE=osMoreCore  -DFOOTERS=1 -DMORECORE_CANNOT_TRIM=1 -DHAVE_MREMAP=0 -DHAVE_MMAP=0 -shared dlmalloc.c -o libmalloc.so
 
