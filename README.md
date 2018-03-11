@@ -17,4 +17,8 @@ use LD_PRELOAD=libmalloc.so lualatex
 
 4. To dump the memory content, an API is provided and please check the test.c for further details.
 
+5. To restore the heap state, set the environment variable CHECKPOINT next application run. 
+
+use LD_PRELOAD=libmalloc.so CHECKPOINT=xxx lualatex
+
 Note that this library is designed for X64 architecture and assume the max heap size is less than 512MB (which can be changed of course.)
