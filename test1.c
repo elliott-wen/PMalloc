@@ -26,5 +26,9 @@ int main()
 	{
 		printf("store okay\n");
 	}
+	else
+	{
+		printf("It is a bug\n");
+	}
 	return 0;
 }
