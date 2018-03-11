@@ -2644,8 +2644,8 @@ static struct malloc_state _gm_;
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#define EHEAP_START_ADDRESS 0xf0000000
-#define EHEAP_SIZE 0x10000000 
+#define EHEAP_START_ADDRESS 0xe0000000
+#define EHEAP_SIZE 0x20000000 
 #define MAGIC_MAGIC 0x08032018
 static int is_mmap_inited = 0;
 static unsigned int allocated_space = 0;
@@ -2673,71 +2673,93 @@ static int init_mmap_eheap()
           int fd = open(memory_input_file_path, O_RDONLY);
           if(fd <= 0)
           {
-              exit(-1);
+              return -1;
           }
 
 
-          data_read = read(fd, &magic_num, 4);
-          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          data_read = read(fd, &magic_num, sizeof(magic_num));
+          if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
           {
-              close(fd);
-              exit(-2);
+              
+              return -1;
           }
           
           data_read = read(fd, &_gm_, sizeof(_gm_));
           if(data_read != sizeof(_gm_))
           {
-              close(fd);
-              exit(-3);
+              
+              return -1;
           }
 
-          data_read = read(fd, &magic_num, 4);
-          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          data_read = read(fd, &magic_num, sizeof(magic_num));
+          if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
           {
-              close(fd);
-              exit(-4);
+              
+              return -1;
           }
 
           data_read = read(fd, &mparams, sizeof(mparams));
           if(data_read != sizeof(mparams))
           {
-              close(fd);
-              exit(-3);
+             
+              return -1;
           }
 
-          data_read = read(fd, &magic_num, 4);
-          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          data_read = read(fd, &magic_num, sizeof(magic_num));
+          if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
           {
-              close(fd);
-              exit(-4);
+             
+              return -1;
           }
 
           data_read = read(fd, &allocated_space, sizeof(allocated_space));
           if(data_read != sizeof(allocated_space) || allocated_space > EHEAP_SIZE)
           {
-              close(fd);
-              exit(-5);
+             
+              return -1;
           }
 
-          data_read = read(fd, &magic_num, 4);
-          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+          data_read = read(fd, &magic_num, sizeof(magic_num));
+          if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
           {
-              close(fd);
-              exit(-6);
+              
+              return -1;
           }
-
+#ifndef ONLY_STORED_MAPPED_PAGE
           data_read = read(fd, (void*)EHEAP_START_ADDRESS, allocated_space);
           if(data_read != allocated_space)
           {
-              close(fd);
-              exit(-7);
+              
+              return -1;
+          }
+#else
+          unsigned int t_page_size = getpagesize();
+          unsigned long t_page_num = 0;
+          while(1)
+          {
+              data_read = read(fd, &t_page_num, sizeof(t_page_num));
+              if(data_read != sizeof(t_page_num))
+              {
+                  return -1;
+              }
+              if(t_page_num == 0)
+              {
+                  break;
+              }
+              data_read = read(fd, (void *)(t_page_num * t_page_size), t_page_size);
+              if(data_read != t_page_size)
+              {
+
+                  return -1;
+              }
           }
 
-          data_read = read(fd, &magic_num, 4);
-          if(data_read <= 0 || magic_num != MAGIC_MAGIC)
+#endif
+
+          data_read = read(fd, &magic_num, sizeof(magic_num));
+          if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
           {
-              close(fd);
-              exit(-8);
+              return -1;
           }
 
           close(fd);
@@ -2752,25 +2774,140 @@ static int init_mmap_eheap()
   return -1;
 }
 
-
-
-
-unsigned int mm_get_allocated_space_size()
+int mm_store_heap_file(char *filename)
 {
-    return allocated_space;
+    int fd = open(filename, O_WRONLY | O_CREAT, 0666);
+    if(fd <= 0)
+    {
+        return -1;
+    }
+
+    unsigned int magic_num = MAGIC_MAGIC;
+    int x = write(fd, &magic_num, sizeof(magic_num));
+    if(x != sizeof(magic_num))
+    {
+        return -1;
+    }
+
+    x = write(fd, &_gm_, sizeof(_gm_));
+    if(x != sizeof(_gm_))
+    {
+        return -1;
+    }
+
+    x = write(fd, &magic_num, sizeof(magic_num));
+    if(x != sizeof(magic_num))
+    {
+        return -1;
+    }
+
+    x = write(fd, &mparams,  sizeof(mparams));
+    if(x != sizeof(mparams))
+    {
+        return -1;
+    }
+    
+    x = write(fd, &magic_num, sizeof(magic_num));
+    if(x != sizeof(magic_num))
+    {
+        return -1;
+    }
+
+    x = write(fd, &allocated_space, sizeof(allocated_space));
+    if(x != sizeof(allocated_space))
+    {
+        return -1;
+    }
+    
+    x = write(fd, &magic_num, sizeof(magic_num));
+    if(x != sizeof(magic_num))
+    {
+        return -1;
+    }
+
+    
+    
+
+#ifndef ONLY_STORED_MAPPED_PAGE
+    x = write(fd, (void*)EHEAP_START_ADDRESS, allocated_space);
+    if(x != allocated_space)
+    {
+        return -1;
+    }
+#else 
+    int page_fd = open("/proc/self/pagemap", O_RDONLY | O_CREAT, 0666);
+    if(page_fd <= 0)
+    {
+        return -1;
+    }
+
+    unsigned int t_page_size = getpagesize();
+    unsigned long max_page_step_num = EHEAP_SIZE/t_page_size;
+    unsigned long start_page_num = EHEAP_START_ADDRESS/t_page_size;
+    unsigned long lseekpos = start_page_num * 8;
+    //First we need to lseek the correct space of the file
+    if(lseek(page_fd, lseekpos, SEEK_SET) == -1)
+    {
+        return -1;
+    }
+    char page_buf[8];
+    for(int j = 0; j < max_page_step_num; j ++)
+    {
+        if(read(page_fd, page_buf, 8) <= 0)
+        {
+            return -1;
+        }
+        if((page_buf[7] & 0x80) != 0) //The page is mapped write it to the file
+        {
+            unsigned long tmp_page_num = j + start_page_num;
+            x = write(fd, &tmp_page_num, sizeof(tmp_page_num));
+            if(x != sizeof(tmp_page_num))
+            {
+                return -1;
+            }
+            x = write(fd, (void *)(tmp_page_num * t_page_size), t_page_size);
+            if(x != t_page_size)
+            {
+                return -1;
+            }
+        }
+    }
+    unsigned long end_j = 0;
+    x = write(fd, &end_j, sizeof(end_j));
+    if(x != sizeof(end_j))
+    {
+        return -1;
+    }
+    close(page_fd);
+#endif
+
+    x= write(fd, &magic_num, sizeof(magic_num));
+    if(x != sizeof(magic_num))
+    {
+        return -1;
+    }
+
+    close(fd);
+    return 0;
 }
 
-unsigned int mm_get_gm_state(void **ptr)
-{
-    *ptr = &_gm_;
-    return sizeof(_gm_);
-}
 
-unsigned int mm_get_mparams(void **ptr)
-{
-    *ptr = &mparams;
-    return sizeof(mparams);
-}
+// unsigned int mm_get_allocated_space_size()
+// {
+//     return allocated_space;
+// }
+
+// unsigned int mm_get_gm_state(void **ptr)
+// {
+//     *ptr = &_gm_;
+//     return sizeof(_gm_);
+// }
+
+// unsigned int mm_get_mparams(void **ptr)
+// {
+//     *ptr = &mparams;
+//     return sizeof(mparams);
+// }
 
 void *osMoreCore(int size)
 {
