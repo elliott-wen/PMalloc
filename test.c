@@ -8,6 +8,17 @@
 
 int main()
 {
+	char data[128];
+	FILE *ftest = fopen("1.txt", "r");
+	fread(data, 1, 2, ftest);
+	//usleep(10000000);
+	int res = fseek(ftest, 0,  SEEK_CUR);
+	//int res = 0;
+	fread(data + 2, 1, 2, ftest);
+	printf("fseek return %d  %c %c %c %c\n", res, data[0], data[1], data[2], data[3]);
+
+	fclose(ftest);
+	return 0;
 	//char *test = malloc(1024);
 	//printf("%p\n", test);
 	// unsigned int (*store_heap_file)(char *filename);

@@ -2645,15 +2645,14 @@ static struct malloc_state _gm_;
 #include <sys/stat.h>
 #include <fcntl.h>
 #define EHEAP_START_ADDRESS 0xde0000000
-#define EHEAP_SIZE 0x40000000 
-#define MAGIC_MAGIC 0x08032018
+#define EHEAP_SIZE 0x20000000 
+#define MAGIC_MAGIC 0x10042018
 static int is_mmap_inited = 0;
 static unsigned int allocated_space = 0;
 
 static int init_mmap_eheap()
 {
 
-    
   char *tmpaddr;
   tmpaddr = mmap((void*)EHEAP_START_ADDRESS, EHEAP_SIZE, PROT_READ | PROT_WRITE,
                  MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
@@ -2661,115 +2660,6 @@ static int init_mmap_eheap()
   {
       return -1;
   }
-  // else
-  // {
-      
-//       unsigned int magic_num;
-//       int data_read = -1;
-//       char* memory_input_file_path;
-//       memory_input_file_path = getenv("CHECKPOINT");
-//       if(memory_input_file_path!=0 && memory_input_file_path[0] != '\0')
-//       { 
-//           int fd = open(memory_input_file_path, O_RDONLY);
-//           if(fd <= 0)
-//           {
-//               return -1;
-//           }
-
-
-//           data_read = read(fd, &magic_num, sizeof(magic_num));
-//           if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
-//           {
-              
-//               return -1;
-//           }
-          
-//           data_read = read(fd, &_gm_, sizeof(_gm_));
-//           if(data_read != sizeof(_gm_))
-//           {
-              
-//               return -1;
-//           }
-
-//           data_read = read(fd, &magic_num, sizeof(magic_num));
-//           if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
-//           {
-              
-//               return -1;
-//           }
-
-//           data_read = read(fd, &mparams, sizeof(mparams));
-//           if(data_read != sizeof(mparams))
-//           {
-             
-//               return -1;
-//           }
-
-//           data_read = read(fd, &magic_num, sizeof(magic_num));
-//           if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
-//           {
-             
-//               return -1;
-//           }
-
-//           data_read = read(fd, &allocated_space, sizeof(allocated_space));
-//           if(data_read != sizeof(allocated_space) || allocated_space > EHEAP_SIZE)
-//           {
-             
-//               return -1;
-//           }
-
-//           data_read = read(fd, &magic_num, sizeof(magic_num));
-//           if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
-//           {
-              
-//               return -1;
-//           }
-// #ifndef ONLY_STORED_MAPPED_PAGE
-//           data_read = read(fd, (void*)EHEAP_START_ADDRESS, allocated_space);
-//           if(data_read != allocated_space)
-//           {
-              
-//               return -1;
-//           }
-// #else
-//           unsigned int t_page_size = getpagesize();
-//           unsigned long t_page_num = 0;
-//           while(1)
-//           {
-//               data_read = read(fd, &t_page_num, sizeof(t_page_num));
-//               if(data_read != sizeof(t_page_num))
-//               {
-//                   return -1;
-//               }
-//               if(t_page_num == 0)
-//               {
-//                   break;
-//               }
-//               data_read = read(fd, (void *)(t_page_num * t_page_size), t_page_size);
-//               if(data_read != t_page_size)
-//               {
-
-//                   return -1;
-//               }
-//           }
-
-// #endif
-
-//           data_read = read(fd, &magic_num, sizeof(magic_num));
-//           if(data_read != sizeof(magic_num) || magic_num != MAGIC_MAGIC)
-//           {
-//               return -1;
-//           }
-
-          // close(fd);
-          // return 0;
-      // }
-      // else
-      // {
-          // return 0;
-      //}
-//  }
     
   return 0;
 }
@@ -2921,23 +2811,6 @@ int pmalloc_store_heap_file(char *filename)
     return 0;
 }
 
-
-// unsigned int mm_get_allocated_space_size()
-// {
-//     return allocated_space;
-// }
-
-// unsigned int mm_get_gm_state(void **ptr)
-// {
-//     *ptr = &_gm_;
-//     return sizeof(_gm_);
-// }
-
-// unsigned int mm_get_mparams(void **ptr)
-// {
-//     *ptr = &mparams;
-//     return sizeof(mparams);
-// }
 
 static void *osMoreCore(int size)
 {
