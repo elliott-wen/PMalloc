@@ -10,6 +10,7 @@
 #ifdef PERSISTENT_FILE
 #define WRITEMODE 0
 #define READMODE 1
+#define MAXFILEALLOWED 16
 struct memfile_cookie {
            char   *buf;        /* Dynamically sized buffer for data */
            size_t  allocated;  /* Size of buf */
@@ -17,9 +18,45 @@ struct memfile_cookie {
            off_t   offset;     /* Current file offset in buf */
            char *open_filename;
            char mode;
+           FILE *fp;
            char int_buf[BUFSIZ];
 
 };
+struct memfile_cookie **cookies = NULL;
+
+static void removeCookie(struct memfile_cookie *cookie)
+{
+  for(int j = 0; j < MAXFILEALLOWED ; j ++)
+  {
+    if(cookies[j] == cookie)
+    {
+      cookies[j] = 0;
+      break;
+    }
+  }
+}
+
+static int findEmptyCookie()
+{
+  if(cookies == NULL)
+   {
+      cookies = dlmalloc(sizeof(struct memfile_cookie*) * MAXFILEALLOWED);
+      if(cookies == NULL)
+      {
+        return -1;
+      }
+      memset(cookies, 0, sizeof(struct memfile_cookie*) * MAXFILEALLOWED);
+   }
+   for(int j = 0; j < MAXFILEALLOWED; j ++)
+   {
+      if(cookies[j] == 0)
+      {
+        return j;
+      }
+   }
+   return -1;
+
+}
 
 static ssize_t z_memfile_write(void *c, const char *buf, size_t size)
 {
@@ -71,55 +108,14 @@ static ssize_t z_memfile_read(void *c, char *buf, size_t size)
 }
 
 
-// static int _reload(void *c)
-// {
-//                 struct memfile_cookie *cookie = c;
-//                 dlfree(cookie->buf);
-//                 cookie->buf = NULL;
-//                 cookie->allocated = 0;
-//                 //Pump New File to the memory
-//                 int input_file_fd = open(cookie->open_filename, O_RDONLY);
-//                 if(input_file_fd > 0)
-//                 {
-//                     size_t file_size = lseek(input_file_fd, (size_t)0, SEEK_END);
-//                     lseek(input_file_fd, 0, SEEK_SET);
-//                     if(file_size < 16 * 1024 * 1024 && file_size > 0)
-//                     {
-//                       char* tmp_buf = dlmalloc(file_size);
-//                       if(tmp_buf != NULL)
-//                       {
-//                         cookie->allocated = file_size;
-//                         cookie->endpos = file_size;
-//                         cookie->buf = tmp_buf;
-//                         return 0;
-//                       }
-//                       else
-//                       {
-//                         return -1;
-//                       }
-//                     }
-//                     else
-//                     {
-//                       return -1;
-//                     }
-//                 }
-//                 else
-//                 {
-//                   return -1;
-//                 }
-// }
+
+
 
 static int z_memfile_seek(void *c, off64_t *offset, int whence)
 {
            off64_t new_offset;
            struct memfile_cookie *cookie = c;
-           // if(cookie->mode == READMODE)
-           // {
-           //    if(_reload(c) != 0)
-           //    {
-           //      return -1;
-           //    }
-           // }
+          
            if (whence == SEEK_SET)
                 new_offset = *offset;         
            else if (whence == SEEK_END)
@@ -163,7 +159,7 @@ static int z_memfile_close(void *c)
            dlfree(cookie->buf);
            cookie->allocated = 0;
            cookie->buf = NULL;
-
+           removeCookie(cookie);
            dlfree(cookie);
            return 0;
 }
@@ -177,6 +173,172 @@ cookie_io_functions_t  z_memfile_func = {
 
 
 
+
+static int _obtain_readable_filechunk_mem(const char *filename, char **_mem, int *_filesize)
+{
+  int input_file_fd = open(filename, O_RDONLY);
+  if(input_file_fd < 0)
+  {
+    return -1;
+  }
+  size_t file_size = lseek(input_file_fd, (size_t)0, SEEK_END);
+  lseek(input_file_fd, 0, SEEK_SET);
+  if(file_size > 16 * 1024 * 1024 && file_size < 0)
+  {
+      close(input_file_fd);
+      return -1;
+  }
+  char* tmp_buf = dlmalloc(file_size);
+  if(tmp_buf == NULL)
+  {
+      close(input_file_fd);
+      return -1;
+  }
+
+  int readS = read(input_file_fd, tmp_buf, file_size);
+  if(readS != file_size)
+  {
+      close(input_file_fd);
+      dlfree(tmp_buf);
+      return -1;
+  }
+
+  *_filesize = file_size;
+  *_mem = tmp_buf;
+  return 0;
+
+
+}
+
+
+
+
+static int _checkfilewritable(const char *filename)
+{
+    int output_file_hd = open(filename, O_WRONLY | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
+    if(output_file_hd > 0)
+    {
+      close(output_file_hd);
+      return 0;
+    }
+    return -1;
+}
+
+static FILE* _fopenread(const char *filename, int slot)
+{
+      FILE *mem_file;
+      char *mem;
+      int file_size;
+      if(_obtain_readable_filechunk_mem(filename, &mem, &file_size) == -1)
+      {
+        return NULL;
+      }
+      int filename_len = strlen(filename);
+      char* open_filename = dlmalloc(filename_len + 1);
+      if(open_filename == NULL)
+      {
+        dlfree(mem);
+        return NULL;
+      }
+
+      struct memfile_cookie *mycookie = dlmalloc(sizeof(struct memfile_cookie));
+      if(mycookie == NULL)
+      {
+        dlfree(mem);
+        dlfree(open_filename);
+        return NULL;
+      }
+      mycookie->allocated = file_size;
+      mycookie->offset = 0;
+      mycookie->endpos = file_size;
+      mycookie->buf = mem;
+      mycookie->open_filename = open_filename;
+      memcpy(mycookie->open_filename, filename, filename_len);
+      mycookie->open_filename[filename_len] = 0;
+      mycookie->mode = READMODE;
+      mem_file = fopencookie(mycookie, "rb", z_memfile_func);
+      if(mem_file == NULL)
+      {
+        dlfree(mem);
+        dlfree(open_filename);
+        dlfree(mycookie);
+        return NULL;
+      }
+      setbuf(mem_file, mycookie->int_buf);     
+      mycookie->fp = mem_file;
+      cookies[slot] = mycookie;
+      return mem_file;
+}
+
+static FILE *_fopenwrite(const char *filename, int slot)
+{
+       FILE* mem_file = NULL;
+      if(_checkfilewritable(filename) == -1)
+      {
+        return NULL;
+      }
+     
+      int filename_len = strlen(filename);
+      char* open_filename = dlmalloc(filename_len + 1);
+      if(open_filename == NULL)
+      {
+        return NULL;
+      }
+         
+      char *tmpbuf = dlmalloc(102400);
+      if(tmpbuf == NULL)
+      {
+        dlfree(open_filename);
+        return NULL;
+      }
+
+      struct memfile_cookie *mycookie = dlmalloc(sizeof(struct memfile_cookie));
+      if(mycookie == NULL)
+      {
+        dlfree(open_filename);
+        dlfree(tmpbuf);
+        return NULL;
+      }
+
+         
+              
+      mycookie->allocated = 102400;
+      mycookie->offset = 0;
+      mycookie->endpos = 0;
+      mycookie->buf = tmpbuf;
+      mycookie->open_filename = open_filename;
+      memcpy(mycookie->open_filename, filename, filename_len);
+      mycookie->open_filename[filename_len] = 0;
+      mycookie->mode = WRITEMODE;
+      mem_file = fopencookie(mycookie, "wb", z_memfile_func);
+      if(mem_file == NULL)
+      {
+        dlfree(open_filename);
+        dlfree(mycookie);
+        return NULL;
+      }
+      setbuf(mem_file, mycookie->int_buf);
+      cookies[slot] = mycookie;
+      mycookie->fp = mem_file;
+      return mem_file;
+}
+
+static int _reloadfile(struct memfile_cookie *cookie)
+{
+    dlfree(cookie->buf);
+    cookie->buf = NULL;
+    
+    char *newmem;
+    int newfilesize;
+    if(_obtain_readable_filechunk_mem(cookie->open_filename, &newmem, &newfilesize) == -1)
+        return -1;
+                
+    cookie->buf = newmem;
+    cookie->allocated = cookie->endpos = newfilesize;
+    return 0;
+    
+}
+
 FILE* fopen(const char* filename, const char* mode){
    // if(orig_fopen == NULL)
    // {
@@ -186,87 +348,41 @@ FILE* fopen(const char* filename, const char* mode){
    // 			return NULL;
    // 		}
    // }
+   int slot = -1;
+   slot = findEmptyCookie();
+   if(slot == -1)
+   {
+    return NULL;
+   }
 
    if(strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0)
    {
-   		/*We directly pump the file into the memory*/
-   		int input_file_fd = open(filename, O_RDONLY);
-   		FILE* mem_file = NULL;
-   		if(input_file_fd > 0)
-   		{
-        int filename_len = strlen(filename);
-        char* open_filename = dlmalloc(filename_len + 1);
-   			size_t file_size = lseek(input_file_fd, (size_t)0, SEEK_END);
-			  lseek(input_file_fd, 0, SEEK_SET);
-	   		if(file_size < 16 * 1024 * 1024 && file_size > 0)
-	   		{
-	   			
-          struct memfile_cookie *mycookie = dlmalloc(sizeof(struct memfile_cookie));
-	   			char* tmp_buf = dlmalloc(file_size);
-	   			if(tmp_buf != NULL && mycookie != NULL)
-	   			{
-	   				int readS = read(input_file_fd, tmp_buf, file_size);
-	   				if(readS == file_size)
-	   				{
-
-                mycookie->allocated = file_size;
-                mycookie->offset = 0;
-                mycookie->endpos = file_size;
-                mycookie->buf = tmp_buf;
-                mycookie->open_filename = open_filename;
-                memcpy(mycookie->open_filename, filename, filename_len);
-                mycookie->open_filename[filename_len] = 0;
-                mycookie->mode = READMODE;
-                mem_file = fopencookie(mycookie, mode, z_memfile_func);
-	   					  if(mem_file != NULL)
-                {
-                  setbuf(mem_file, mycookie->int_buf);
-                }
-	   				}
-	   			}
-	   		
-	   		}
-	   	
-	   		close(input_file_fd);
-
-   		}
-   		
-   		return mem_file;
+      return _fopenread(filename, slot);
    }
    else if(strcmp(mode, "w") == 0 || strcmp(mode, "wb") == 0)
    {
    		//printf("===>opening %s\n", filename);
-      int output_file_hd = open(filename, O_WRONLY | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
-      FILE* mem_file = NULL;
-   		if(output_file_hd > 0)
-      {
-          close(output_file_hd);//We dont write now.
-          int filename_len = strlen(filename);
-          char* open_filename = dlmalloc(filename_len + 1);
-          //printf("==>opening %s\n", filename);
-          struct memfile_cookie *mycookie = dlmalloc(sizeof(struct memfile_cookie));
-          char* tmp_buf = dlmalloc(4096);
-          if(tmp_buf != NULL && mycookie != NULL && open_filename != NULL)
-          {
-              
-              mycookie->allocated = 4096;
-              mycookie->offset = 0;
-              mycookie->endpos = 0;
-              mycookie->buf = tmp_buf;
-              mycookie->open_filename = open_filename;
-              memcpy(mycookie->open_filename, filename, filename_len);
-              mycookie->open_filename[filename_len] = 0;
-              mycookie->mode = WRITEMODE;
-              mem_file = fopencookie(mycookie, mode, z_memfile_func);
-              if(mem_file != NULL)
-              {
-                  setbuf(mem_file, mycookie->int_buf);
-              }
-          }
-      }
-      return mem_file;
+      
+      return _fopenwrite(filename, slot);
 
    }
    return NULL;
+}
+
+int restartfilestream()
+{
+  if(cookies == NULL) return -1;
+  for(int j = 0; j < MAXFILEALLOWED; j ++)
+  {
+    if(cookies[j] != 0 && cookies[j]->mode == READMODE)
+    {
+      fflush(cookies[j]->fp);
+      if(_reloadfile(cookies[j]) == -1)
+      {
+        return -1;
+      }
+    }
+  }
+  return 0;
 }
 #endif
