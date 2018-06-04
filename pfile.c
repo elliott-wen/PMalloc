@@ -369,7 +369,7 @@ FILE* fopen(const char* filename, const char* mode){
    return NULL;
 }
 
-int restartfilestream()
+int pfile_reload_input_file()
 {
   if(cookies == NULL) return -1;
   for(int j = 0; j < MAXFILEALLOWED; j ++)
