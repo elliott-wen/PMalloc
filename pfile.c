@@ -104,6 +104,7 @@ static ssize_t z_memfile_read(void *c, char *buf, size_t size)
            memcpy(buf, cookie->buf + cookie->offset, xbytes);
 
            cookie->offset += xbytes;
+           //printf("reading %d\n", cookie->offset);
            return xbytes;
 }
 
@@ -140,7 +141,7 @@ static int z_memfile_close(void *c)
            struct memfile_cookie *cookie = c;
            if(cookie->mode == WRITEMODE && cookie->open_filename != NULL)
            {
-              int output_file_hd = open(cookie->open_filename, O_WRONLY | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
+              int output_file_hd = open(cookie->open_filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU | S_IRGRP | S_IROTH);
               if(output_file_hd > 0)
               {
                   write(output_file_hd, cookie->buf, cookie->offset);
@@ -203,6 +204,7 @@ static int _obtain_readable_filechunk_mem(const char *filename, char **_mem, int
       return -1;
   }
 
+  close(input_file_fd);
   *_filesize = file_size;
   *_mem = tmp_buf;
   return 0;
@@ -327,7 +329,7 @@ static int _reloadfile(struct memfile_cookie *cookie)
 {
     dlfree(cookie->buf);
     cookie->buf = NULL;
-    
+    //printf("reloading %s %d\n", cookie->open_filename, cookie->offset);
     char *newmem;
     int newfilesize;
     if(_obtain_readable_filechunk_mem(cookie->open_filename, &newmem, &newfilesize) == -1)
@@ -360,13 +362,13 @@ FILE* fopen(const char* filename, const char* mode){
       return _fopenread(filename, slot);
    }
    else if(strcmp(mode, "w") == 0 || strcmp(mode, "wb") == 0)
-   {
+   { 
    		//printf("===>opening %s\n", filename);
       
       return _fopenwrite(filename, slot);
 
    }
-   return NULL;
+   return NULL; 
 }
 
 int pfile_reload_input_file()
@@ -377,8 +379,10 @@ int pfile_reload_input_file()
     if(cookies[j] != 0 && cookies[j]->mode == READMODE)
     {
       fflush(cookies[j]->fp);
+      //printf("before %d\n", cookies[j]->offset);
       if(_reloadfile(cookies[j]) == -1)
       {
+
         return -1;
       }
     }
